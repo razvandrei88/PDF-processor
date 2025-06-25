@@ -34,20 +34,33 @@ def get_pdf_info(file_path):
 
 def main():
     results = []
+    pdf_files = []
+
+    # Collect all PDF files first
     for dirpath, _, filenames in os.walk('.'):
         for filename in fnmatch.filter(filenames, '*.pdf'):
-            file_path = os.path.join(dirpath, filename)
-            pages, size, title, author = get_pdf_info(file_path)
+            pdf_files.append(os.path.join(dirpath, filename))
 
-            if pages is not None and size is not None:
-                ratio = size / pages if pages > 0 else 0
-                results.append([author, title, pages, size, ratio, file_path])
+    total_files = len(pdf_files)
+    print(f"Found {total_files} PDF files to process.")
 
-    # Exportăm rezultatele în CSV
+    # Process each PDF file
+    for index, file_path in enumerate(pdf_files):
+        print(f"Processing file {index + 1}/{total_files}: {file_path}")
+        pages, size, title, author = get_pdf_info(file_path)
+
+        if pages is not None and size is not None:
+            ratio = size / pages if pages > 0 else 0
+            results.append([author, title, pages, size, ratio, file_path])
+
+    # Export results to CSV
     with open('pdf_info.csv', 'w', newline='', encoding='utf-8') as csvfile:
         csv_writer = csv.writer(csvfile)
         csv_writer.writerow(['Author', 'Title', 'Pages', 'Size (bytes)', 'Ratio', 'File Path'])  # Header
         csv_writer.writerows(results)
+
+    print("Processing complete. Results saved to 'pdf_info.csv'.")
+
 
 if __name__ == "__main__":
     main()
