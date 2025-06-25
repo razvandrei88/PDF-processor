@@ -3,6 +3,7 @@ import subprocess
 import fnmatch
 import csv
 import argparse
+import concurrent.futures
 
 def get_pdf_info(file_path):
     try:
@@ -32,6 +33,15 @@ def get_pdf_info(file_path):
         print(f"An unexpected error occurred with file '{file_path}': {e}")
         return None, None, None, None
 
+# Function to process a single PDF file
+def process_pdf(file_path):
+    print(f"Processing: {file_path}")
+    pages, size, title, author = get_pdf_info(file_path)
+    if pages is not None and size is not None:
+        ratio = size / pages if pages > 0 else 0
+        return [author, title, pages, size, ratio, file_path]
+    return None
+
 def main():
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Extract PDF metadata and save to CSV.')
@@ -53,14 +63,13 @@ def main():
     total_files = len(pdf_files)
     print(f"Found {total_files} PDF files to process.")
 
-    # Process each PDF file
-    for index, file_path in enumerate(pdf_files):
-        print(f"Processing file {index + 1}/{total_files}: {file_path}")
-        pages, size, title, author = get_pdf_info(file_path)
-
-        if pages is not None and size is not None:
-            ratio = size / pages if pages > 0 else 0
-            results.append([author, title, pages, size, ratio, file_path])
+    # Use ThreadPoolExecutor to process files in parallel
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_to_file = {executor.submit(process_pdf, file_path): file_path for file_path in pdf_files}
+        for future in concurrent.futures.as_completed(future_to_file):
+            result = future.result()
+            if result:
+                results.append(result)
 
     # Export results to the specified CSV file
     with open(args.output, 'w', newline='', encoding='utf-8') as csvfile:
