@@ -5,27 +5,32 @@ import csv
 
 def get_pdf_info(file_path):
     try:
-        # Executăm pdfinfo și capturăm ieșirea
+        # Execute pdfinfo and capture the output
         output = subprocess.check_output(['pdfinfo', file_path], stderr=subprocess.DEVNULL, text=True)
         pages = None
         size = None
         title = None
         author = None
 
-        # Procesăm ieșirea pentru a extrage numărul de pagini, dimensiunea, titlul și autorul
+        # Process the output to extract pages, size, title, and author
         for line in output.splitlines():
             if "Pages:" in line:
                 pages = int(line.split(":")[1].strip())
             elif "File size:" in line:
-                size = int(line.split(":")[1].strip().split()[0])  # Extragem doar numărul
+                size = int(line.split(":")[1].strip().split()[0])  # Extract only the number
             elif "Title:" in line:
                 title = line.split(":")[1].strip()
             elif "Author:" in line:
                 author = line.split(":")[1].strip()
 
         return pages, size, title, author
-    except Exception as e:
+    except subprocess.CalledProcessError as e:
+        print(f"Error processing file '{file_path}': {e}")
         return None, None, None, None
+    except Exception as e:
+        print(f"An unexpected error occurred with file '{file_path}': {e}")
+        return None, None, None, None
+
 
 def main():
     results = []
