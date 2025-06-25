@@ -4,6 +4,11 @@ import fnmatch
 import csv
 import argparse
 import concurrent.futures
+import logging
+
+# Set up logging
+logging.basicConfig(filename='pdf_processing.log', level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 def get_pdf_info(file_path):
     try:
@@ -61,23 +66,39 @@ def main():
             pdf_files.append(os.path.join(dirpath, filename))
 
     total_files = len(pdf_files)
-    print(f"Found {total_files} PDF files to process.")
+    logging.info(f"Found {total_files} PDF files to process.")
+
+    # Function to process a single PDF file
+    def process_pdf(file_path):
+        logging.info(f"Processing: {file_path}")
+        pages, size, title, author = get_pdf_info(file_path)
+        if pages is not None and size is not None:
+            ratio = size / pages if pages > 0 else 0
+            return [author, title, pages, size, ratio, file_path]
+        return None
 
     # Use ThreadPoolExecutor to process files in parallel
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future_to_file = {executor.submit(process_pdf, file_path): file_path for file_path in pdf_files}
-        for future in concurrent.futures.as_completed(future_to_file):
+        for index, future in enumerate(concurrent.futures.as_completed(future_to_file)):
             result = future.result()
             if result:
                 results.append(result)
+            # Update progress bar
+            progress = (index + 1) / total_files
+            bar_length = 40  # Length of the progress bar
+            block = int(round(bar_length * progress))
+            progress_bar = "#" * block + "-" * (bar_length - block)
+            print(f"\r[{progress_bar}] {index + 1}/{total_files} files processed", end='')
 
+    print()  # Move to the next line after the progress bar
     # Export results to the specified CSV file
     with open(args.output, 'w', newline='', encoding='utf-8') as csvfile:
         csv_writer = csv.writer(csvfile)
         csv_writer.writerow(['Author', 'Title', 'Pages', 'Size (bytes)', 'Ratio', 'File Path'])  # Header
         csv_writer.writerows(results)
 
-    print(f"Processing complete. Results saved to '{args.output}'.")
+    logging.info(f"Processing complete. Results saved to '{args.output}'.")
 
 if __name__ == "__main__":
     main()
