@@ -5,6 +5,7 @@ import csv
 import argparse
 import concurrent.futures
 import logging
+import math
 
 # Set up logging
 logging.basicConfig(filename='pdf_processing.log', level=logging.INFO,
@@ -38,12 +39,30 @@ def get_pdf_info(file_path):
         print(f"An unexpected error occurred with file '{file_path}': {e}")
         return None, None, None, None
 
+def sanitize_data(author, title):
+    # Replace empty entries with "N/A"
+    author = author.strip() if author else "N/A"
+    title = title.strip() if title else "N/A"
+
+    # Remove unwanted characters (example: keep only alphanumeric and basic punctuation)
+    author = ''.join(c for c in author if c.isalnum() or c in (" ", ".", ",", "-"))
+    title = ''.join(c for c in title if c.isalnum() or c in (" ", ".", ",", "-"))
+
+    # Standardize author format (example: "Last, First" to "First Last")
+    if ',' in author:
+        parts = author.split(',')
+        author = f"{parts[1].strip()} {parts[0].strip()}" if len(parts) == 2 else author
+
+    return author, title
+
+
 # Function to process a single PDF file
 def process_pdf(file_path):
-    print(f"Processing: {file_path}")
+    logging.info(f"Processing: {file_path}")
     pages, size, title, author = get_pdf_info(file_path)
     if pages is not None and size is not None:
         ratio = size / pages if pages > 0 else 0
+        author, title = sanitize_data(author, title)  # Sanitize the data
         return [author, title, pages, size, ratio, file_path]
     return None
 
@@ -73,7 +92,7 @@ def main():
         logging.info(f"Processing: {file_path}")
         pages, size, title, author = get_pdf_info(file_path)
         if pages is not None and size is not None:
-            ratio = size / pages if pages > 0 else 0
+            ratio = math.ceil(size / pages) if pages > 0 else 0
             return [author, title, pages, size, ratio, file_path]
         return None
 
