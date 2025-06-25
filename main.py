@@ -2,6 +2,7 @@ import os
 import subprocess
 import fnmatch
 import csv
+import argparse
 
 def get_pdf_info(file_path):
     try:
@@ -31,13 +32,21 @@ def get_pdf_info(file_path):
         print(f"An unexpected error occurred with file '{file_path}': {e}")
         return None, None, None, None
 
-
 def main():
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description='Extract PDF metadata and save to CSV.')
+    parser.add_argument('-d', '--directory', type=str, default='.', 
+                        help='Directory to scan for PDF files (default: current directory)')
+    parser.add_argument('-o', '--output', type=str, default='pdf_info.csv', 
+                        help='Output CSV file name (default: pdf_info.csv)')
+    
+    args = parser.parse_args()
+
     results = []
     pdf_files = []
 
-    # Collect all PDF files first
-    for dirpath, _, filenames in os.walk('.'):
+    # Collect all PDF files from the specified directory
+    for dirpath, _, filenames in os.walk(args.directory):
         for filename in fnmatch.filter(filenames, '*.pdf'):
             pdf_files.append(os.path.join(dirpath, filename))
 
@@ -53,14 +62,13 @@ def main():
             ratio = size / pages if pages > 0 else 0
             results.append([author, title, pages, size, ratio, file_path])
 
-    # Export results to CSV
-    with open('pdf_info.csv', 'w', newline='', encoding='utf-8') as csvfile:
+    # Export results to the specified CSV file
+    with open(args.output, 'w', newline='', encoding='utf-8') as csvfile:
         csv_writer = csv.writer(csvfile)
         csv_writer.writerow(['Author', 'Title', 'Pages', 'Size (bytes)', 'Ratio', 'File Path'])  # Header
         csv_writer.writerows(results)
 
-    print("Processing complete. Results saved to 'pdf_info.csv'.")
-
+    print(f"Processing complete. Results saved to '{args.output}'.")
 
 if __name__ == "__main__":
     main()
