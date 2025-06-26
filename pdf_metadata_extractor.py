@@ -1,11 +1,12 @@
 import os
-import subprocess
 import fnmatch
 import argparse
 import concurrent.futures
 import logging
 import warnings
 import sqlite3
+from datetime import datetime
+from PyPDF2 import PdfReader
 
 # Suppress specific warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -40,25 +41,16 @@ def setup_database(db_path='pdf_metadata.db'):
 
 def get_pdf_info(file_path):
     try:
-        output = subprocess.check_output(['pdfinfo', file_path], stderr=subprocess.DEVNULL, text=True)
-        pages = size = title = author = None
-
-        for line in output.splitlines():
-            if "Pages:" in line:
-                pages = int(line.split(":")[1].strip())
-            elif "File size:" in line:
-                size = int(line.split(":")[1].strip().split()[0])
-            elif "Title:" in line:
-                title = line.split(":")[1].strip()
-            elif "Author:" in line:
-                author = line.split(":")[1].strip()
+        with open(file_path, 'rb') as f:
+            reader = PdfReader(f)
+            pages = len(reader.pages)
+            size = os.path.getsize(file_path)
+            title = reader.metadata.title if reader.metadata.title else None
+            author = reader.metadata.author if reader.metadata.author else None
 
         return pages, size, title, author
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Error processing file '{file_path}': {e}")
-        return None, None, None, None
     except Exception as e:
-        logging.error(f"Unexpected error with file '{file_path}': {e}")
+        logging.error(f"Error processing file '{file_path}': {e}")
         return None, None, None, None
 
 def sanitize_data(author, title):
@@ -74,9 +66,28 @@ def sanitize_data(author, title):
     
     return author, title
 
+import os
+import time
+
 def process_pdf(file_path):
     """Process a single PDF and save results to database."""
     logging.info(f"Processing: {file_path}")
+    
+    # Check if the file has been processed before
+    conn = sqlite3.connect('pdf_metadata.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT last_processed FROM pdf_metadata WHERE file_path = ?', (file_path,))
+    result = cursor.fetchone()
+    
+    last_processed = result[0] if result else None
+    file_modified_time = os.path.getmtime(file_path)
+
+    # If the file has not been modified since last processed, skip it
+    if last_processed and last_processed >= datetime.fromtimestamp(file_modified_time):
+        logging.info(f"Skipping already processed file: {file_path}")
+        return
+    
     pages, size, title, author = get_pdf_info(file_path)
     
     if pages is None or size is None:
@@ -84,9 +95,6 @@ def process_pdf(file_path):
     
     ratio = size / pages if pages > 0 else 0
     author, title = sanitize_data(author, title)
-    
-    conn = sqlite3.connect('pdf_metadata.db')
-    cursor = conn.cursor()
     
     try:
         cursor.execute('''
