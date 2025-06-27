@@ -5,6 +5,7 @@ import concurrent.futures
 import logging
 import warnings
 import sqlite3
+import math
 from datetime import datetime
 from PyPDF2 import PdfReader
 
@@ -66,9 +67,6 @@ def sanitize_data(author, title):
     
     return author, title
 
-import os
-import time
-
 def process_pdf(file_path):
     """Process a single PDF and save results to database."""
     logging.info(f"Processing: {file_path}")
@@ -93,7 +91,7 @@ def process_pdf(file_path):
     if pages is None or size is None:
         return
     
-    ratio = size / pages if pages > 0 else 0
+    ratio = math.ceil(size / pages) if pages > 0 else 0
     author, title = sanitize_data(author, title)
     
     try:
