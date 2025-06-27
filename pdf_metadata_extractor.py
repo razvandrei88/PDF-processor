@@ -28,7 +28,7 @@ def setup_database(db_path='pdf_metadata.db'):
             title TEXT,
             pages INTEGER,
             size_bytes INTEGER,
-            size_per_page_ratio REAL,
+            size_per_page_ratio INTEGER,
             file_path TEXT UNIQUE,
             last_processed TIMESTAMP
         )
