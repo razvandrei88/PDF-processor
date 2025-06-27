@@ -5,9 +5,9 @@ import concurrent.futures
 import logging
 import warnings
 import sqlite3
-import math
 from datetime import datetime
 from PyPDF2 import PdfReader
+from math import ceil
 
 # Suppress specific warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -24,8 +24,6 @@ def setup_database(db_path='pdf_metadata.db'):
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS pdf_metadata (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            author TEXT,
-            title TEXT,
             pages INTEGER,
             size_bytes INTEGER,
             size_per_page_ratio INTEGER,
@@ -46,26 +44,11 @@ def get_pdf_info(file_path):
             reader = PdfReader(f)
             pages = len(reader.pages)
             size = os.path.getsize(file_path)
-            title = reader.metadata.title if reader.metadata.title else None
-            author = reader.metadata.author if reader.metadata.author else None
-
-        return pages, size, title, author
+           
+        return pages, size
     except Exception as e:
         logging.error(f"Error processing file '{file_path}': {e}")
-        return None, None, None, None
-
-def sanitize_data(author, title):
-    author = author.strip() if author else "N/A"
-    title = title.strip() if title else "N/A"
-    
-    author = ''.join(c for c in author if c.isalnum() or c in (" ", ".", ",", "-"))
-    title = ''.join(c for c in title if c.isalnum() or c in (" ", ".", ",", "-"))
-    
-    if ',' in author:
-        parts = author.split(',')
-        author = f"{parts[1].strip()} {parts[0].strip()}" if len(parts) == 2 else author
-    
-    return author, title
+        return None, None
 
 def process_pdf(file_path):
     """Process a single PDF and save results to database."""
@@ -76,30 +59,20 @@ def process_pdf(file_path):
     cursor = conn.cursor()
     
     cursor.execute('SELECT last_processed FROM pdf_metadata WHERE file_path = ?', (file_path,))
-    result = cursor.fetchone()
     
-    last_processed = result[0] if result else None
-    file_modified_time = os.path.getmtime(file_path)
-
-    # If the file has not been modified since last processed, skip it
-    if last_processed and last_processed >= datetime.fromtimestamp(file_modified_time):
-        logging.info(f"Skipping already processed file: {file_path}")
-        return
-    
-    pages, size, title, author = get_pdf_info(file_path)
+    pages, size = get_pdf_info(file_path)
     
     if pages is None or size is None:
         return
     
-    ratio = math.ceil(size / pages) if pages > 0 else 0
-    author, title = sanitize_data(author, title)
-    
+    ratio = ceil(size / pages) if pages > 0 else 0
+
     try:
         cursor.execute('''
             INSERT OR REPLACE INTO pdf_metadata 
-            (author, title, pages, size_bytes, size_per_page_ratio, file_path, last_processed)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (author, title, pages, size, ratio, file_path, datetime.now()))
+            (pages, size_bytes, size_per_page_ratio, file_path, last_processed)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (pages, size, ratio, file_path, datetime.now()))
         
         conn.commit()
     except Exception as e:

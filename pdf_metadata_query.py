@@ -4,20 +4,6 @@ def connect_db(db_path='pdf_metadata.db'):
     """Connect to the SQLite database."""
     return sqlite3.connect(db_path)
 
-def search_by_author(author_name, db_path='pdf_metadata.db'):
-    """Search for PDFs by author name."""
-    conn = connect_db(db_path)
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT * FROM pdf_metadata WHERE author LIKE ?
-    ''', (f'%{author_name}%',))
-    
-    results = cursor.fetchall()
-    conn.close()
-    
-    return results
-
 def get_largest_files(limit=10, db_path='pdf_metadata.db'):
     """Return the largest PDFs by size."""
     conn = connect_db(db_path)
@@ -25,6 +11,20 @@ def get_largest_files(limit=10, db_path='pdf_metadata.db'):
     
     cursor.execute('''
         SELECT * FROM pdf_metadata ORDER BY size_bytes DESC LIMIT ?
+    ''', (limit,))
+    
+    results = cursor.fetchall()
+    conn.close()
+    
+    return results
+
+def get_best_ratio(limit=10, db_path='pdf_metadata.db'):
+    """Return the largest PDFs by size."""
+    conn = connect_db(db_path)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT * FROM pdf_metadata ORDER BY size_per_page_ratio DESC LIMIT ?
     ''', (limit,))
     
     results = cursor.fetchall()
@@ -46,14 +46,14 @@ def list_all_entries(db_path='pdf_metadata.db'):
 def print_results(results):
     """Print the results in a readable format."""
     for row in results:
-        print(f"ID: {row[0]}, Author: {row[1]}, Title: {row[2]}, Pages: {row[3]}, "
-              f"Size (bytes): {row[4]}, Ratio: {row[5]:.2f}, File Path: {row[6]}, "
-              f"Last Processed: {row[7]}")
+        print(f"ID: {row[0]}, Pages: {row[1]}, "
+              f"Size (bytes): {row[2]}, Ratio: {row[3]}, File Path: {row[4]}, "
+              f"Last Processed: {row[5]}")
 
 def main():
     while True:
         print("\nPDF Metadata Query Tool")
-        print("1. Search by Author")
+        print("1. Get Best Ratio Files")
         print("2. Get Largest Files")
         print("3. List All Entries")
         print("4. Exit")
@@ -61,8 +61,8 @@ def main():
         choice = input("Select an option: ")
         
         if choice == '1':
-            author_name = input("Enter author name to search: ")
-            results = search_by_author(author_name)
+            limit = int(input("Enter the number of best ratio files to retrieve: "))
+            results = get_largest_files(limit)
             print_results(results)
         
         elif choice == '2':
